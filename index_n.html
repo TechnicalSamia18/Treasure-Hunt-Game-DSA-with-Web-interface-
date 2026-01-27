@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 THE DARK CASTLE - Treasure Hunt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Georgia', serif; 
+            overflow-x: hidden;
+            background: #000;
+        }
+
+        /* Animations */
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+        @keyframes flicker { 0%, 100% { opacity: 1; text-shadow: 0 0 20px currentColor; } 50% { opacity: 0.7; text-shadow: 0 0 40px currentColor; } }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px currentColor; } 50% { box-shadow: 0 0 40px currentColor, 0 0 60px currentColor; } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-50px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        
+        .pulse-animation { animation: pulse 2s infinite; }
+        .flicker { animation: flicker 3s infinite; }
+        .float-animation { animation: float 4s ease-in-out infinite; }
+        .glow-animation { animation: glow 2s infinite; }
+        
+        /* Particle Background */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: radial-gradient(circle, #8b5cf6, transparent);
+            border-radius: 50%;
+            animation: particleFloat 10s infinite;
+        }
+        
+        @keyframes particleFloat {
+            0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.8); }
+        ::-webkit-scrollbar-thumb { 
+            background: linear-gradient(180deg, #8b5cf6, #d4af37);
+            border-radius: 6px;
+            box-shadow: 0 0 10px #8b5cf6;
+        }
+
+        /* Map Container */
+        .map-container {
+            position: relative;
+            width: 100%;
+            height: 550px;
+            background: linear-gradient(135deg, rgba(10, 5, 30, 0.95), rgba(5, 5, 15, 0.98));
+            border-radius: 2rem;
+            border: 3px solid rgba(139, 92, 246, 0.4);
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(139, 92, 246, 0.3), inset 0 0 100px rgba(0, 0, 0, 0.8);
+        }
+
+        .map-room {
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 10, 40, 0.98));
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .map-room:hover {
+            transform: scale(1.2) translateY(-10px);
+            box-shadow: 0 15px 50px rgba(139, 92, 246, 0.8);
+            z-index: 100;
+        }
+
+        .map-room.current {
+            border: 4px solid #a855f7;
+            box-shadow: 0 0 60px rgba(168, 85, 247, 1), 0 0 100px rgba(168, 85, 247, 0.5);
+            background: linear-gradient(135deg, rgba(109, 40, 217, 0.95), rgba(88, 28, 135, 0.98));
+            animation: glow 2s infinite;
+        }
+
+        .map-room-name {
+            font-size: 0.7rem;
+            color: #e9d5ff;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 6px;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 1);
+            letter-spacing: 1px;
+        }
+
+        .map-path {
+            position: absolute;
+            background: linear-gradient(90deg, rgba(139, 92, 246, 0.4), rgba(168, 85, 247, 0.6), rgba(139, 92, 246, 0.4));
+            transform-origin: top left;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: linear-gradient(135deg, rgba(10, 5, 25, 0.97), rgba(5, 5, 15, 0.99));
+            backdrop-filter: blur(25px);
+            border-radius: 2rem;
+            border: 3px solid rgba(139, 92, 246, 0.4);
+            padding: 2.5rem;
+            box-shadow: 0 25px 90px rgba(0, 0, 0, 0.95), 
+                        inset 0 2px 20px rgba(255, 255, 255, 0.05),
+                        0 0 50px rgba(139, 92, 246, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 70%);
+            animation: float 8s ease-in-out infinite;
+        }
+
+        /* Room Buttons */
+        .room-button {
+            position: relative;
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 10, 40, 0.98));
+            padding: 2rem;
+            border-radius: 1.2rem;
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+
+        .room-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.3), transparent);
+            transition: 0.5s;
+        }
+
+        .room-button:hover::before {
+            left: 100%;
+        }
+
+        .room-button:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 20px 60px rgba(139, 92, 246, 0.6);
+            border-color: #a855f7;
+        }
+
+        /* Stats Cards */
+        .stat-card {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(15, 10, 40, 0.98));
+            border-radius: 1.5rem;
+            padding: 1.8rem;
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), 
+                        inset 0 2px 10px rgba(255, 255, 255, 0.05);
+            text-align: center;
+            color: white;
+            backdrop-filter: blur(15px);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(139, 92, 246, 0.5);
+        }
+
+        .stat-card.gold {
+            background: linear-gradient(135deg, rgba(75, 50, 20, 0.95), rgba(40, 25, 10, 0.98));
+            border: 3px solid rgba(212, 175, 55, 0.5);
+        }
+
+        .stat-card.red {
+            background: linear-gradient(135deg, rgba(60, 20, 20, 0.95), rgba(30, 10, 10, 0.98));
+            border: 3px solid rgba(220, 38, 38, 0.5);
+        }
+
+        /* Messages */
+        .message-box {
+            border-radius: 1.5rem;
+            padding: 1.8rem;
+            margin-bottom: 2rem;
+            border: 3px solid;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
+            animation: slideIn 0.5s ease-out;
+            letter-spacing: 1px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(109, 40, 217, 0.9), rgba(88, 28, 135, 0.95));
+            color: #e9d5ff;
+            font-weight: bold;
+            padding: 1rem 2.5rem;
+            border-radius: 1rem;
+            border: 3px solid rgba(168, 85, 247, 0.5);
+            cursor: pointer;
+            font-size: 1.15rem;
+            box-shadow: 0 8px 30px rgba(109, 40, 217, 0.6);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn-primary:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 50px rgba(168, 85, 247, 0.9);
+        }
+
+        .btn-reset {
+            width: 100%;
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.9), rgba(15, 10, 40, 0.95));
+            color: #e9d5ff;
+            font-weight: bold;
+            padding: 1.5rem;
+            border-radius: 1.2rem;
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+            transition: all 0.3s;
+        }
+
+        .btn-reset:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 60px rgba(139, 92, 246, 0.7);
+            border-color: #a855f7;
+        }
+
+        /* Game Over Box */
+        .game-over-victory {
+            background: linear-gradient(135deg, rgba(120, 53, 15, 0.9), rgba(69, 26, 3, 0.95));
+            border: 5px solid #d4af37;
+            border-radius: 2rem;
+            padding: 4rem;
+            box-shadow: 0 0 80px rgba(212, 175, 55, 0.8), 
+                        inset 0 4px 30px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.8s ease-out;
+        }
+
+        .game-over-defeat {
+            background: linear-gradient(135deg, rgba(60, 20, 20, 0.9), rgba(30, 10, 10, 0.95));
+            border: 5px solid #dc2626;
+            border-radius: 2rem;
+            padding: 4rem;
+            box-shadow: 0 0 80px rgba(220, 38, 38, 0.8), 
+                        inset 0 4px 30px rgba(0, 0, 0, 0.6);
+            animation: slideIn 0.8s ease-out, shake 0.5s;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(139, 92, 246, 0.2);
+            border-top: 6px solid #8b5cf6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Move counter badge */
+        .move-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.4));
+            border: 2px solid #60a5fa;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: #dbeafe;
+            margin-left: 0.5rem;
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.4);
+        }
+
+        /* Summary styles */
+        .summary-path {
+            background: linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(15, 10, 40, 0.7));
+            border: 2px solid rgba(212, 175, 55, 0.4);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        .summary-treasure-name {
+            color: #fbbf24;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 10px rgba(212, 175, 55, 0.6);
+        }
+
+        .path-nodes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .path-node {
+            background: rgba(109, 40, 217, 0.3);
+            border: 2px solid #8b5cf6;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            color: #e9d5ff;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(139, 92, 246, 0.4);
+        }
+
+        .path-arrow {
+            color: #d4af37;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Particle Background -->
+    <div class="particles" id="particles"></div>
+
+    <div style="min-height: 100vh; width: 100%; position: relative; overflow: hidden;">
+        <!-- Animated Background -->
+        <div style="position: absolute; inset: 0; background-image: url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1920'); background-size: cover; background-position: center; filter: brightness(0.15) contrast(1.3); background-attachment: fixed;"></div>
+        <div style="position: absolute; inset: 0; background: radial-gradient(circle at 30% 50%, rgba(109, 40, 217, 0.15) 0%, transparent 50%), radial-gradient(circle at 70% 50%, rgba(212, 175, 55, 0.15) 0%, transparent 50%);"></div>
+        <div style="position: absolute; inset: 0; box-shadow: inset 0 0 300px rgba(0, 0, 0, 0.9);"></div>
+
+        <div style="position: relative; z-index: 10; min-height: 100vh; padding: 2rem;">
+            
+            <!-- Header -->
+            <div style="text-align: center; margin-bottom: 3rem;" class="float-animation">
+                <h1 class="flicker" style="font-size: 4.5rem; font-weight: bold; color: #d4af37; text-shadow: 0 0 30px rgba(212, 175, 55, 1), 0 0 60px rgba(139, 92, 246, 0.8), 0 5px 20px rgba(0, 0, 0, 0.9); margin-bottom: 1rem; font-family: 'Georgia', serif; letter-spacing: 5px;">
+                    ⚔️ THE DARK CASTLE ⚔️
+                </h1>
+                <p style="font-size: 1.4rem; color: #a78bfa; font-style: italic; text-shadow: 0 2px 15px rgba(0, 0, 0, 1); letter-spacing: 2px;">
+                    ⚡ C++ Sorcery • Ancient Algorithms • Forbidden Treasures ⚡
+                </p>
+                <div id="status" class="glow-animation" style="display: inline-block; padding: 0.8rem 2.5rem; border-radius: 30px; margin-top: 1.2rem; font-size: 1.1rem; box-shadow: 0 6px 25px rgba(0, 0, 0, 0.8); font-weight: bold; letter-spacing: 1px;">
+                    ⚠️ Awakening the Ancient Server...
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto 3rem;">
+                <div class="stat-card">
+                    <p style="font-size: 1rem; opacity: 0.8; margin: 0; color: #a78bfa; letter-spacing: 1px;">📍 CURRENT CHAMBER</p>
+                    <p id="currentRoom" style="font-size: 2rem; font-weight: bold; margin: 0.6rem 0; color: #e9d5ff; text-shadow: 0 3px 12px rgba(139, 92, 246, 0.8);">Loading...</p>
+                </div>
+                
+                <div class="stat-card gold">
+                    <p style="font-size: 1rem; opacity: 0.8; margin: 0; color: #fcd34d; letter-spacing: 1px;">💎 ANCIENT RELICS</p>
+                    <p id="treasures" style="font-size: 2rem; font-weight: bold; margin: 0.6rem 0; color: #fde68a; text-shadow: 0 3px 12px rgba(212, 175, 55, 0.8);">0/3</p>
+                </div>
+                
+                <div class="stat-card red">
+                    <p style="font-size: 1rem; opacity: 0.8; margin: 0; color: #fca5a5; letter-spacing: 1px;">👣 STEPS REMAINING</p>
+                    <p id="movesLeft" style="font-size: 2rem; font-weight: bold; margin: 0.6rem 0; color: #fecaca; text-shadow: 0 3px 12px rgba(220, 38, 38, 0.8);">...</p>
+                </div>
+            </div>
+
+            <div style="max-width: 1300px; margin: 0 auto;">
+                
+                <!-- Castle Map -->
+                <div class="glass-card" style="margin-bottom: 2.5rem;">
+                    <h2 style="font-size: 2.2rem; font-weight: bold; color: #d4af37; margin: 0 0 2rem 0; text-align: center; text-shadow: 0 3px 15px rgba(212, 175, 55, 0.8); letter-spacing: 3px;">
+                        🗺️ CASTLE MAP
+                    </h2>
+                    <div id="castleMap" class="map-container">
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                            <div class="spinner"></div>
+                            <p style="color: #9ca3af; text-align: center; margin-top: 2rem; font-style: italic; font-size: 1.1rem;">Loading castle layout...</p>
+                        </div>
+                    </div>
+                    <p style="color: #9ca3af; text-align: center; font-size: 1rem; margin-top: 1.5rem; font-style: italic; letter-spacing: 1px;">
+                        💜 Purple glow = Your location • Lines = Connected paths
+                    </p>
+                </div>
+
+                <!-- Main Game Panel -->
+                <div class="glass-card" style="margin-bottom: 2.5rem;">
+                    
+                    <!-- Message Box -->
+                    <div id="message" style="display: none;"></div>
+
+                    <!-- Hint Box -->
+                    <div id="hintBox" style="display: none; background: linear-gradient(135deg, rgba(109, 40, 217, 0.3), rgba(88, 28, 135, 0.4)); border: 3px solid #a855f7; border-radius: 1.5rem; padding: 2rem; margin-bottom: 2rem; box-shadow: 0 0 50px rgba(168, 85, 247, 0.6);">
+                        <p id="hintText" style="color: #e9d5ff; text-align: center; font-size: 1.3rem; margin: 0; font-style: italic; text-shadow: 0 3px 15px rgba(0, 0, 0, 1); letter-spacing: 1px;"></p>
+                    </div>
+
+                    <!-- Game Over Box -->
+                    <div id="gameOverBox" style="display: none; text-align: center; margin-bottom: 2.5rem;"></div>
+
+                    <!-- Controls Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 2px solid rgba(139, 92, 246, 0.3);">
+                        <h3 style="font-size: 2rem; font-weight: bold; color: #d4af37; margin: 0; text-shadow: 0 3px 15px rgba(212, 175, 55, 0.8); letter-spacing: 2px;">
+                            🚪 CONNECTED CHAMBERS
+                            <span id="moveCounter" class="move-badge">Move: 0</span>
+                        </h3>
+                        <button onclick="getHint()" id="hintBtn" class="btn-primary" style="position: relative; z-index: 1;">
+                            🔮 SEEK GUIDANCE
+                        </button>
+                    </div>
+
+                    <!-- Room List -->
+                    <div id="roomList" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+                        <div style="grid-column: 1/-1; text-align: center;">
+                            <div class="spinner"></div>
+                            <p style="color: #9ca3af; text-align: center; margin-top: 1rem; font-style: italic;">Discovering chambers...</p>
+                        </div>
+                    </div>
+
+                    <!-- Reset Button -->
+                    <button id="resetBtn" class="btn-reset">
+                        🔄 BEGIN NEW QUEST (Randomize Treasures)
+                    </button>
+
+                    <!-- Footer Info -->
+                    <div style="background: linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(10, 5, 20, 0.8)); border-radius: 1.2rem; padding: 1.8rem; border: 2px solid rgba(75, 85, 99, 0.5); box-shadow: inset 0 3px 15px rgba(0, 0, 0, 0.7); margin-top: 2rem;">
+                        <p style="color: #9ca3af; text-align: center; font-size: 1.05rem; margin: 0; line-height: 1.8; letter-spacing: 0.5px;">
+                            <strong style="color: #a78bfa; font-size: 1.1rem;">⚡ POWERED BY ANCIENT C++ SORCERY</strong><br>
+                            Graph Enchantments • BFS Spells • Limited <strong style="color: #fca5a5;">STEPS</strong> before darkness falls!
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Shortest Path Summary (shown after game over) -->
+                <div id="pathSummary" class="glass-card" style="display: none; margin-bottom: 2.5rem;">
+                    <h2 style="font-size: 2.2rem; font-weight: bold; color: #d4af37; margin: 0 0 2rem 0; text-align: center; text-shadow: 0 3px 15px rgba(212, 175, 55, 0.8); letter-spacing: 3px;">
+                        📜 TREASURE MAP SUMMARY
+                    </h2>
+                    <p style="color: #9ca3af; text-align: center; font-size: 1.1rem; margin-bottom: 2rem; font-style: italic;">
+                        Shortest paths from Entrance to each treasure location
+                    </p>
+                    <div id="pathContent"></div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <p style="color: #6b7280; margin-top: 3rem; text-align: center; font-size: 1rem; font-style: italic; text-shadow: 0 2px 10px rgba(0, 0, 0, 1); letter-spacing: 1px;">
+                ⚔️ Backend: C++ Necromancy (Graph + BFS) • Frontend: Dark Arts HTML/CSS/JS • Real-time Shadow Communication ⚔️
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+        let gameState = null;
+        let treasureLocations = []; // Store original treasure locations
+        
+        const roomIcons = {
+            'Entrance': '🏰', 'Hall': '👑', 'Armory': '⚔️',
+            'TreasureRoom': '💰', 'Library': '📚', 'Kitchen': '🍳',
+            'Dungeon': '🗝️', 'Observatory': '🔭', 'Garden': '🌺',
+            'Balcony': '🌙'
+        };
+
+        // Room positions for the map
+        const roomPositions = {
+            'Entrance': { x: 8, y: 48 },
+            'Hall': { x: 28, y: 48 },
+            'Library': { x: 28, y: 20 },
+            'Armory': { x: 48, y: 48 },
+            'Kitchen': { x: 48, y: 20 },
+            'TreasureRoom': { x: 68, y: 34 },
+            'Dungeon': { x: 48, y: 75 },
+            'Observatory': { x: 72, y: 8 },
+            'Balcony': { x: 88, y: 8 },
+            'Garden': { x: 72, y: 75 }
+        };
+
+        // Create particles
+        function createParticles() {
+            const particles = document.getElementById('particles');
+            for(let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (Math.random() * 5 + 5) + 's';
+                particles.appendChild(particle);
+            }
+        }
+
+        function drawCastleMap() {
+            if (!gameState) return;
+
+            const mapContainer = document.getElementById('castleMap');
+            mapContainer.innerHTML = '';
+
+            // Draw paths
+            gameState.rooms.forEach(room => {
+                const roomPos = roomPositions[room.name];
+                if (!roomPos) return;
+
+                room.adjacent.forEach(adjName => {
+                    const adjPos = roomPositions[adjName];
+                    if (!adjPos) return;
+
+                    const x1 = roomPos.x + 4.5;
+                    const y1 = roomPos.y + 4.5;
+                    const x2 = adjPos.x + 4.5;
+                    const y2 = adjPos.y + 4.5;
+
+                    const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+                    const path = document.createElement('div');
+                    path.className = 'map-path';
+                    path.style.left = `${x1}%`;
+                    path.style.top = `${y1}%`;
+                    path.style.width = `${length}%`;
+                    path.style.height = '3px';
+                    path.style.transform = `rotate(${angle}deg)`;
+                    mapContainer.appendChild(path);
+                });
+            });
+
+            // Draw rooms (NO treasure highlighting during game)
+            gameState.rooms.forEach(room => {
+                const pos = roomPositions[room.name];
+                if (!pos) return;
+
+                const roomDiv = document.createElement('div');
+                roomDiv.className = 'map-room';
+                
+                if (room.name === gameState.currentRoom) {
+                    roomDiv.classList.add('current');
+                }
+
+                roomDiv.style.left = `${pos.x}%`;
+                roomDiv.style.top = `${pos.y}%`;
+                
+                roomDiv.innerHTML = `
+                    ${roomIcons[room.name] || '🚪'}
+                    <div class="map-room-name">${room.name.toUpperCase()}</div>
+                `;
+
+                roomDiv.onclick = () => {
+                    if (room.name !== gameState.currentRoom && !gameState.gameOver) {
+                        moveToRoom(room.name);
+                    }
+                };
+
+                mapContainer.appendChild(roomDiv);
+            });
+        }
+
+        async function loadGameState() {
+            try {
+                const response = await fetch(`${API_URL}/state`, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (!response.ok) throw new Error('Server error');
+                
+                gameState = await response.json();
+                
+                // Store treasure locations from server
+                if (gameState.treasureLocations && gameState.treasureLocations.length > 0) {
+                    treasureLocations = gameState.treasureLocations;
+                }
+                
+                updateConnectionStatus(true);
+                updateUI();
+                drawCastleMap();
+            } catch (error) {
+                updateConnectionStatus(false);
+                console.error('Cannot connect to C++ server:', error);
+            }
+        }
+
+        async function moveToRoom(room) {
+            if (!gameState || gameState.gameOver) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/move?room=${encodeURIComponent(room)}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.foundTreasure) {
+                        showMessage(`🎉 ANCIENT RELIC DISCOVERED IN ${room.toUpperCase()}!`, 'success');
+                    } else {
+                        showMessage(`✅ Entered ${room}`, 'info');
+                    }
+                } else {
+                    showMessage(`❌ The path to ${room} is blocked!`, 'error');
+                }
+                
+                await loadGameState();
+            } catch (error) {
+                showMessage('❌ Dark magic prevents movement!', 'error');
+            }
+        }
+
+        async function getHint() {
+            try {
+                const response = await fetch(`${API_URL}/hint`);
+                const result = await response.json();
+                
+                document.getElementById('hintText').textContent = '🔮 ' + result.hint;
+                document.getElementById('hintBox').style.display = 'block';
+                
+                if (result.used) {
+                    const hintBtn = document.getElementById('hintBtn');
+                    hintBtn.disabled = true;
+                    hintBtn.style.background = 'linear-gradient(135deg, rgba(55, 65, 81, 0.7), rgba(31, 41, 55, 0.9))';
+                    hintBtn.style.cursor = 'not-allowed';
+                    hintBtn.style.opacity = '0.4';
+                    hintBtn.textContent = '🔮 GUIDANCE EXHAUSTED';
+                }
+                
+                await loadGameState();
+            } catch (error) {
+                showMessage('❌ The spirits remain silent', 'error');
+            }
+        }
+
+        async function resetGame() {
+            try {
+                const response = await fetch(`${API_URL}/reset`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    treasureLocations = [];
+                    showMessage('🔄 The castle has been reset. New treasures await in the shadows...', 'info');
+                    
+                    // Hide game over elements
+                    document.getElementById('gameOverBox').style.display = 'none';
+                    document.getElementById('hintBox').style.display = 'none';
+                    document.getElementById('pathSummary').style.display = 'none';
+                    
+                    // Re-enable hint button
+                    const hintBtn = document.getElementById('hintBtn');
+                    hintBtn.disabled = false;
+                    hintBtn.style.background = 'linear-gradient(135deg, rgba(109, 40, 217, 0.9), rgba(88, 28, 135, 0.95))';
+                    hintBtn.style.cursor = 'pointer';
+                    hintBtn.style.opacity = '1';
+                    hintBtn.textContent = '🔮 SEEK GUIDANCE';
+                }
+                
+                await loadGameState();
+            } catch (error) {
+                showMessage('❌ The ritual failed!', 'error');
+            }
+        }
+
+        function updateUI() {
+            if (!gameState) return;
+
+            document.getElementById('currentRoom').textContent = gameState.currentRoom;
+            document.getElementById('treasures').textContent = `${gameState.treasuresFound}/3`;
+            
+            const movesLeft = gameState.maxMoves ? (gameState.maxMoves - gameState.moves) : 0;
+            document.getElementById('movesLeft').textContent = movesLeft;
+            
+            // Update move counter
+            document.getElementById('moveCounter').textContent = `Move: ${gameState.moves}`;
+
+            // Update hint button state
+            if (gameState.hintUsed) {
+                const hintBtn = document.getElementById('hintBtn');
+                hintBtn.disabled = true;
+                hintBtn.style.background = 'linear-gradient(135deg, rgba(55, 65, 81, 0.7), rgba(31, 41, 55, 0.9))';
+                hintBtn.style.cursor = 'not-allowed';
+                hintBtn.style.opacity = '0.4';
+                hintBtn.textContent = '🔮 GUIDANCE EXHAUSTED';
+            }
+
+            if (gameState.gameOver) {
+                showGameOver();
+            } else {
+                updateRoomList();
+            }
+        }
+
+        function updateRoomList() {
+            const currentRoomData = gameState.rooms.find(r => r.name === gameState.currentRoom);
+            if (!currentRoomData) return;
+
+            const adjacentRooms = currentRoomData.adjacent;
+            const roomListHTML = adjacentRooms.map(roomName => {
+                return `
+                    <button onclick="moveToRoom('${roomName}')" class="room-button">
+                        <div style="font-size: 3.5rem; text-align: center; margin-bottom: 1rem; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 1)); position: relative; z-index: 1;">${roomIcons[roomName] || '🚪'}</div>
+                        <p style="color: #e9d5ff; font-weight: bold; font-size: 1.2rem; text-align: center; margin: 0; text-shadow: 0 3px 12px rgba(0, 0, 0, 1); letter-spacing: 1px; position: relative; z-index: 1;">${roomName.toUpperCase()}</p>
+                    </button>
+                `;
+            }).join('');
+
+            document.getElementById('roomList').innerHTML = roomListHTML;
+        }
+
+        async function showGameOver() {
+            const gameOverBox = document.getElementById('gameOverBox');
+            
+            if (gameState.won) {
+                gameOverBox.innerHTML = `
+                    <div class="game-over-victory">
+                        <div class="float-animation" style="font-size: 8rem; margin-bottom: 2rem; filter: drop-shadow(0 0 30px rgba(212, 175, 55, 1));">👑</div>
+                        <h2 class="flicker" style="font-size: 4rem; font-weight: bold; color: #fde68a; margin-bottom: 1.5rem; text-shadow: 0 0 40px rgba(212, 175, 55, 1); letter-spacing: 3px;">QUEST COMPLETED!</h2>
+                        <p style="font-size: 1.8rem; color: #fef3c7; margin: 1rem 0;">All ancient relics have been claimed!</p>
+                        <p style="font-size: 1.4rem; color: #fde68a;">Conquered in ${gameState.moves} steps</p>
+                    </div>
+                `;
+            } else {
+                gameOverBox.innerHTML = `
+                    <div class="game-over-defeat">
+                        <div style="font-size: 7rem; margin-bottom: 2rem; filter: drop-shadow(0 0 30px rgba(220, 38, 38, 1));">💀</div>
+                        <h2 class="flicker" style="font-size: 4rem; font-weight: bold; color: #fca5a5; margin-bottom: 1.5rem; text-shadow: 0 0 40px rgba(220, 38, 38, 1); letter-spacing: 3px;">DARKNESS PREVAILS</h2>
+                        <p style="font-size: 1.8rem; color: #fecaca; margin: 1rem 0;">Your steps have been exhausted...</p>
+                        <p style="font-size: 1.4rem; color: #f87171;">Relics claimed: ${gameState.treasuresFound}/3</p>
+                    </div>
+                `;
+            }
+            
+            gameOverBox.style.display = 'block';
+            document.getElementById('roomList').innerHTML = '<p style="color: #6b7280; text-align: center; grid-column: 1/-1; font-style: italic; font-size: 1.2rem;">The quest has ended. Begin anew to challenge fate once more...</p>';
+            
+            // Show shortest path summary for ALL treasure locations
+            await showPathSummary();
+        }
+
+        async function showPathSummary() {
+            const pathContent = document.getElementById('pathContent');
+            pathContent.innerHTML = '';
+            
+            if (!treasureLocations || treasureLocations.length === 0) {
+                pathContent.innerHTML = '<p style="color: #9ca3af; text-align: center;">No treasure locations found.</p>';
+                document.getElementById('pathSummary').style.display = 'block';
+                return;
+            }
+            
+            for (const treasureRoom of treasureLocations) {
+                try {
+                    const response = await fetch(`${API_URL}/path?start=Entrance&end=${encodeURIComponent(treasureRoom)}`);
+                    const result = await response.json();
+                    
+                    if (result.path && result.path.length > 0) {
+                        const pathHTML = `
+                            <div class="summary-path">
+                                <div class="summary-treasure-name">💎 ${treasureRoom.toUpperCase()}</div>
+                                <div class="path-nodes">
+                                    ${result.path.map((room, index) => `
+                                        <span class="path-node">${room}</span>
+                                        ${index < result.path.length - 1 ? '<span class="path-arrow">→</span>' : ''}
+                                    `).join('')}
+                                </div>
+                                <p style="color: #9ca3af; margin-top: 1rem; font-size: 0.95rem;">
+                                    <strong>Distance:</strong> ${result.path.length - 1} steps from Entrance
+                                </p>
+                            </div>
+                        `;
+                        pathContent.innerHTML += pathHTML;
+                    }
+                } catch (error) {
+                    console.error(`Failed to get path to ${treasureRoom}:`, error);
+                }
+            }
+            
+            document.getElementById('pathSummary').style.display = 'block';
+        }
+
+        function showMessage(text, type) {
+            const messageBox = document.getElementById('message');
+            messageBox.textContent = text;
+            messageBox.className = 'message-box';
+            messageBox.style.display = 'block';
+            
+            if (type === 'success') {
+                messageBox.style.background = 'linear-gradient(135deg, rgba(34, 197, 94, 0.3), rgba(21, 128, 61, 0.4))';
+                messageBox.style.borderColor = '#4ade80';
+                messageBox.style.color = '#dcfce7';
+                messageBox.style.boxShadow = '0 0 40px rgba(74, 222, 128, 0.6)';
+            } else if (type === 'error') {
+                messageBox.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.4))';
+                messageBox.style.borderColor = '#f87171';
+                messageBox.style.color = '#fee2e2';
+                messageBox.style.boxShadow = '0 0 40px rgba(248, 113, 113, 0.6)';
+            } else {
+                messageBox.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.4))';
+                messageBox.style.borderColor = '#60a5fa';
+                messageBox.style.color = '#dbeafe';
+                messageBox.style.boxShadow = '0 0 40px rgba(96, 165, 250, 0.6)';
+            }
+            
+            setTimeout(() => messageBox.style.display = 'none', 5000);
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('status');
+            if (connected) {
+                status.style.background = 'linear-gradient(135deg, rgba(34, 197, 94, 0.4), rgba(21, 128, 61, 0.5))';
+                status.style.border = '3px solid #4ade80';
+                status.style.color = '#dcfce7';
+                status.style.boxShadow = '0 0 30px rgba(74, 222, 128, 0.6)';
+                status.textContent = '✅ ANCIENT SERVER AWAKENED';
+            } else {
+                status.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(185, 28, 28, 0.5))';
+                status.style.border = '3px solid #f87171';
+                status.style.color = '#fee2e2';
+                status.style.boxShadow = '0 0 30px rgba(248, 113, 113, 0.6)';
+                status.textContent = '❌ SERVER LIES DORMANT';
+            }
+        }
+
+        // Attach reset function to button on load
+        window.onload = function() {
+            console.log('🏰 Connecting to the ancient C++ server...');
+            createParticles();
+            
+            // Attach event listener to reset button
+            document.getElementById('resetBtn').addEventListener('click', resetGame);
+            
+            loadGameState();
+            setInterval(loadGameState, 3000);
+        };
+    </script>
+</body>
+</html>
